@@ -17,6 +17,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Teste simples
+        run: echo "CI rodando corretamente ✅"
+
       # ---------- Node.js (executa só se houver package.json) ----------
       - name: Detect Node project
         id: has_node
