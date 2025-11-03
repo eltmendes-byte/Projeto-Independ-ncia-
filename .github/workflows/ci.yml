@@ -108,8 +108,7 @@ jobs:
 
   # ---------- (Opcional) Deploy para GitHub Pages ----------
   deploy:
-    needs: setup-and-test
-    if: ${{ always() && hashFiles('dist/**') != '' }}
+    if: ${{ always() && (hashFiles('dist/**') != '') }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
