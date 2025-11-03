@@ -1,4 +1,4 @@
-name: Simple CI (minimal)
+name: Simple CI (with optional Pages)
 
 on:
   push:
@@ -7,35 +7,65 @@ on:
     branches: [ "main" ]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      has_dist: ${{ steps.check_dist.outputs.exists }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
+      # Node (só se existir package.json)
       - name: Detect Node
-        id: node
+        id: has_node
         run: |
-          if [ -f package.json ]; then
-            echo "node=true" >> "$GITHUB_OUTPUT"
-          fi
+          if [ -f package.json ]; then echo "node=true" >> "$GITHUB_OUTPUT"; else echo "node=false" >> "$GITHUB_OUTPUT"; fi
 
       - name: Setup Node
-        if: steps.node.outputs.node == 'true'
+        if: steps.has_node.outputs.node == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
 
-      - name: Install deps
-        if: steps.node.outputs.node == 'true'
+      - name: Install
+        if: steps.has_node.outputs.node == 'true'
         run: npm ci
 
-      - name: Build (if script exists)
-        if: steps.node.outputs.node == 'true'
+      - name: Build
+        if: steps.has_node.outputs.node == 'true'
         run: |
-          if npm run | grep -q " build"; then
-            npm run build
+          if npm run | grep -q " build"; then npm run build; else echo "Sem script build"; fi
+
+      # Verifica se existe dist/ com arquivos
+      - name: Check dist
+        id: check_dist
+        run: |
+          if [ -d dist ] && [ "$(ls -A dist)" ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
           else
-            echo "No build script. Skipping."
+            echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
+
+      # Só envia artefato se dist/ existir
+      - name: Upload Pages artifact
+        if: steps.check_dist.outputs.exists == 'true'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    if: needs.build.outputs.has_dist == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    steps:
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v4
